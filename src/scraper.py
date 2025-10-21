@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -272,7 +273,9 @@ class JobScraper:
         company = self._extract_text(card, ["jobCompany", "job-company"])
         location = self._extract_text(card, ["jobLocation", "job-location"])
         salary = self._extract_text(card, ["jobSalary", "job-salary"])
-        posted_at = self._extract_text(card, ["jobListingDate", "jobCardDate", "listing-date"])
+        posted_at = self._normalize_posted_at(
+            self._extract_text(card, ["jobListingDate", "jobCardDate", "listing-date"])
+        )
         description = self._extract_text(card, ["jobShortDescription", "job-short-description"])
         job_url = self._extract_job_url(card)
         job_id = self._extract_job_id(card) or self._derive_job_id_from_url(job_url)
@@ -335,7 +338,9 @@ class JobScraper:
         if salary:
             job.salary = salary
 
-        posted_at = self._extract_text(soup, ["job-detail-date", "jobListingDate", "listing-date"])
+        posted_at = self._normalize_posted_at(
+            self._extract_text(soup, ["job-detail-date", "jobListingDate", "listing-date"])
+        )
         if posted_at:
             job.posted_at = posted_at
 
@@ -370,6 +375,116 @@ class JobScraper:
         element = self._find_by_data_automation(card, automation_keys)
         if element and element.get_text(strip=True):
             return element.get_text(strip=True)
+        return None
+
+    def _normalize_posted_at(self, raw: Optional[str]) -> Optional[str]:
+        """Convert relative posted date text to an ISO 8601 timestamp when possible."""
+
+        if raw is None:
+            return None
+
+        parsed = self._parse_posted_timestamp(raw)
+        return parsed or raw
+
+    @staticmethod
+    def _parse_posted_timestamp(raw: str) -> Optional[str]:
+        """Parse relative Seek timestamps (e.g. "17 min ago") into ISO 8601 strings."""
+
+        text = raw.strip()
+        if not text:
+            return None
+
+        normalized = text.lower().strip()
+        normalized = normalized.replace("+", " ")
+
+        now = datetime.now(timezone.utc)
+
+        if re.search(r"\byesterday\b", normalized):
+            return (now - timedelta(days=1)).isoformat(timespec="seconds")
+        unit_map = {
+            "minute": "minutes",
+            "minutes": "minutes",
+            "min": "minutes",
+            "mins": "minutes",
+            "hour": "hours",
+            "hours": "hours",
+            "hr": "hours",
+            "hrs": "hours",
+            "h": "hours",
+            "day": "days",
+            "days": "days",
+            "d": "days",
+            "week": "weeks",
+            "weeks": "weeks",
+            "w": "weeks",
+            "month": "months",
+            "months": "months",
+            "mo": "months",
+            "mos": "months",
+            "mth": "months",
+            "mths": "months",
+            "year": "years",
+            "years": "years",
+            "yr": "years",
+            "yrs": "years",
+            "y": "years",
+        }
+
+        pattern = re.compile(
+            r"(?P<num>\d+)\s*(?P<unit>minutes?|mins?|minute|min|hours?|hrs?|hr|h|days?|d|weeks?|w|months?|mos?|mth|mths|years?|yrs?|y)\b"
+        )
+        match = pattern.search(normalized)
+        if match:
+            try:
+                value = int(match.group("num"))
+            except ValueError:
+                return None
+
+            normalized_unit = unit_map.get(match.group("unit"))
+            if not normalized_unit:
+                return None
+
+            delta = JobScraper._timedelta_for_unit(normalized_unit, value)
+            if delta is None:
+                return None
+
+            return (now - delta).isoformat(timespec="seconds")
+
+        if re.search(r"less than a minute", normalized):
+            return now.isoformat(timespec="seconds")
+
+        approx_match = re.search(
+            r"\ban?\s*(?P<unit>minutes?|mins?|minute|min|hours?|hrs?|hr|h|days?|d|weeks?|w|months?|mos?|mth|mths|years?|yrs?|y)\b",
+            normalized,
+        )
+        if approx_match:
+            normalized_unit = unit_map.get(approx_match.group("unit"))
+            if normalized_unit:
+                delta = JobScraper._timedelta_for_unit(normalized_unit, 1)
+                if delta is not None:
+                    return (now - delta).isoformat(timespec="seconds")
+
+        if re.search(r"\btoday\b", normalized) or re.search(r"\bjust\b", normalized):
+            return now.isoformat(timespec="seconds")
+
+        return None
+
+    @staticmethod
+    def _timedelta_for_unit(unit: str, value: int) -> Optional[timedelta]:
+        """Create a :class:`datetime.timedelta` for a normalized unit name."""
+
+        if unit == "minutes":
+            return timedelta(minutes=value)
+        if unit == "hours":
+            return timedelta(hours=value)
+        if unit == "days":
+            return timedelta(days=value)
+        if unit == "weeks":
+            return timedelta(weeks=value)
+        if unit == "months":
+            return timedelta(days=30 * value)
+        if unit == "years":
+            return timedelta(days=365 * value)
         return None
 
     def _extract_job_url(self, card: Any) -> Optional[str]:
@@ -507,7 +622,7 @@ class JobScraper:
 
         posted_at = schema.get("datePosted")
         if posted_at and not job.posted_at:
-            job.posted_at = posted_at
+            job.posted_at = self._normalize_posted_at(str(posted_at))
 
         apply_url = schema.get("applicationLink")
         if not apply_url:
