@@ -35,6 +35,11 @@ class JobListing:
     posted_at: Optional[str] = None
     apply_url: Optional[str] = None
     job_url: Optional[str] = None
+    requirements: Optional[str] = None
+    benefits: Optional[str] = None
+    company_description: Optional[str] = None
+    application_method: Optional[str] = None
+    seniority_level: Optional[str] = None
     source: str = "Seek"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -61,6 +66,11 @@ class JobListing:
             "postedAt": clean(self.posted_at),
             "applyUrl": clean(self.apply_url),
             "jobUrl": clean(self.job_url),
+            "requirements": clean(self.requirements),
+            "benefits": clean(self.benefits),
+            "companyDescription": clean(self.company_description),
+            "applicationMethod": clean(self.application_method),
+            "seniorityLevel": clean(self.seniority_level),
             "source": clean(self.source),
         }
 

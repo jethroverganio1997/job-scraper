@@ -1,5 +1,6 @@
 """Job scraper package providing scraping utilities."""
 
-from .scraper import JobScraper, JobListing
+from .linkedin_scraper import LinkedInScraper
+from .scraper import JobListing, JobScraper
 
-__all__ = ["JobScraper", "JobListing"]
+__all__ = ["JobScraper", "JobListing", "LinkedInScraper"]
