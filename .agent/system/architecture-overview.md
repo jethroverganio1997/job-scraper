@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-The **Job-Scraper** is a Python-based web scraping application designed to extract job listings from SEEK.com.au, one of Australia's leading job boards. The project focuses on software engineering jobs and outputs structured JSON data for further processing.
+The **Job-Scraper** is a Python-based web scraping application designed to extract job listings from SEEK.com.au and LinkedIn without authentication. The project focuses on software engineering jobs and outputs structured JSON data for further processing.
 
 ## High-Level Architecture
 
@@ -42,6 +42,7 @@ The **Job-Scraper** is a Python-based web scraping application designed to extra
 - **BeautifulSoup**: HTML parsing and data extraction
 - **Playwright**: Browser automation for complex scenarios
 - **Multi-Selector Strategy**: Resilient CSS selectors for DOM changes
+- **Multi-board Support**: `JobScraper` (Seek) and `LinkedInScraper` (LinkedIn)
 
 ### 3. Data Processing Layer
 - **JobListing Model**: Standardized data structure with dataclass
@@ -92,6 +93,7 @@ Convert to dict → Save to JSON → Console summary → Completion
 - **Multiple Selectors**: Fallback CSS selectors for robustness
 - **Configurable Parameters**: Runtime behavior modification
 - **Extensible Design**: Easy addition of new job boards
+- **Concrete Implementations**: `JobScraper` (Seek) and `LinkedInScraper` (LinkedIn) share the `JobListing` schema
 
 ### 3. Data Model Pattern
 - **JobListing Dataclass**: Type-safe data structure
@@ -166,11 +168,12 @@ Convert to dict → Save to JSON → Console summary → Completion
 
 ### Current Integrations
 - **SEEK.com.au**: Primary job board target
+- **LinkedIn**: Public job listings via LinkedInScraper
 - **Crawl4AI**: Scraping framework
 - **OpenAI**: Optional AI features (configured but not implemented)
 
 ### Future Integration Points
-- **Additional Job Boards**: LinkedIn, Indeed, Glassdoor
+- **Additional Job Boards**: Indeed, Glassdoor
 - **Database Systems**: SQLite, PostgreSQL
 - **API Frameworks**: FastAPI, Flask
 - **Monitoring Systems**: Logging, metrics, alerting

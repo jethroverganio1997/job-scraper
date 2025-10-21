@@ -6,12 +6,12 @@
 
 ## System Purpose
 
-The Job Scraper System is a specialized web scraping application designed to extract job listings from SEEK.com.au, one of Australia's leading job boards. The system focuses on software engineering positions and provides structured data output for further analysis and processing.
+The Job Scraper System is a specialized web scraping application designed to extract job listings from SEEK.com.au and LinkedIn without authentication. The system focuses on software engineering positions and provides structured data output for further analysis and processing.
 
 ## Core Components
 
 ### 1. JobListing Data Model
-**Location**: `src/scraper.py:15-48`
+**Location**: `src/scraper.py`
 
 The `JobListing` dataclass represents the canonical data structure for job information:
 
@@ -31,7 +31,12 @@ class JobListing:
     posted_at: Optional[str]       # Posting date/time
     apply_url: Optional[str]       # Direct application URL
     job_url: Optional[str]         # Job listing URL
-    source: str = "Seek"           # Data source identifier
+    requirements: Optional[str]    # Key requirements extracted from detail page
+    benefits: Optional[str]        # Benefits/perks summary
+    company_description: Optional[str]  # Company overview text
+    application_method: Optional[str]   # Apply button label or method
+    seniority_level: Optional[str]      # Role seniority indicator
+    source: str = "Seek"           # Data source identifier (overridden per scraper)
 ```
 
 **Key Features**:
@@ -86,7 +91,48 @@ https://www.seek.com.au/jobs?keywords={keywords}&where={location}&page={page}&da
 - Convert relative dates to ISO 8601 format
 - Apply validation and business rules
 
-### 3. Data Processing Pipeline
+### 3. LinkedInScraper Engine
+**Location**: `src/linkedin_scraper.py`
+
+The LinkedIn scraper mirrors the Seek implementation but adapts to LinkedIn's public job listings experience.
+
+#### Configuration Management
+- **Environment Variables**: `LINKEDIN_KEYWORDS`, `LINKEDIN_LOCATION`, `LINKEDIN_MAX_JOBS`, `LINKEDIN_MAX_PAGES`, `LINKEDIN_TIME_FILTER`
+- **LinkedInSearchConfig**: Dataclass consolidating runtime configuration
+- **Time Filter**: Converts second-based windows (e.g. 86400) to `f_TPR` query parameters
+
+**Configuration Parameters**:
+```python
+LINKEDIN_KEYWORDS="software engineer"   # Search keywords
+LINKEDIN_LOCATION="United States"       # Geographic filter
+LINKEDIN_MAX_JOBS=5                     # Max jobs to collect
+LINKEDIN_MAX_PAGES=2                    # Pagination depth (25 jobs/page)
+LINKEDIN_TIME_FILTER=86400              # Seconds since posting (0 disables filter)
+```
+
+#### URL Construction System
+- **Base URL**: `https://www.linkedin.com/jobs/search`
+- **Query Parameters**: Keywords, location, pagination via `start`, optional time filter
+- **Pagination Logic**: Uses `JOBS_PER_PAGE=25` to compute `start` offsets
+
+#### Scraping Pipeline
+
+**Stage 1: Search Page Processing**
+- Fetch search results with Crawl4AI and stealth headers
+- Extract job cards using multiple selectors (`ul.jobs-search__results-list li`, `.base-card`)
+- Parse title, company, location, posted date, and work arrangement
+
+**Stage 2: Detail Page Enrichment**
+- Follow `jobUrl` to fetch detail page with dedicated configuration
+- Extract description, work type, work arrangement, salary, company metadata
+- Capture optional fields (requirements, benefits, application method, seniority)
+
+**Stage 3: Data Processing**
+- Normalize relative posting timestamps to ISO 8601
+- Consolidate section content under semantic headings (e.g. Requirements, Benefits)
+- Preserve consistent `JobListing` JSON schema used across scrapers
+
+### 4. Data Processing Pipeline
 
 #### Date Normalization System
 **Location**: `src/scraper.py:600-650`
@@ -139,7 +185,7 @@ Normalizes text content for consistent output:
 - **Character Encoding**: Handle special characters properly
 - **Content Structuring**: Format descriptions for readability
 
-### 4. Async Architecture
+### 5. Async Architecture
 
 #### AsyncWebCrawler Integration
 - **Concurrent Processing**: Multiple pages processed simultaneously
@@ -185,40 +231,76 @@ Convert to JSON → Save to file → Generate summary → Complete execution
 ## CSS Selector Strategy
 
 ### Search Page Selectors
-**Location**: `src/scraper.py:200-250`
-
-Multiple selector strategies for robustness:
+**Seek** (`src/scraper.py`)
 
 ```python
-# Primary selectors (current SEEK layout)
 JOB_CARD_SELECTORS = [
-    "[data-automation='searchResults'] article",
-    ".y735df0._12Fs8vG4GnyCewh_VJq0Ls",
-    "article[data-automation='normalJob']"
+    "[data-automation='normalJob']",
+    "[data-automation='premiumJob']",
+    "[data-automation='job-card']",
 ]
 
-# Job data selectors
 TITLE_SELECTORS = ["[data-automation='jobTitle']", "a[data-automation='job-link'] span"]
 COMPANY_SELECTORS = ["[data-automation='jobCompany']", "span[data-automation='job-company']"]
 LOCATION_SELECTORS = ["[data-automation='jobLocation']", "span[data-automation='job-location']"]
 ```
 
-### Detail Page Selectors
-**Location**: `src/scraper.py:300-350`
+**LinkedIn** (`src/linkedin_scraper.py`)
 
 ```python
-# Comprehensive job detail extraction
+SEARCH_CARD_SELECTORS = [
+    "ul.jobs-search__results-list li",
+    "div.base-card",
+    "div.job-search-card",
+]
+
+TITLE_SELECTORS = [
+    "h3.base-search-card__title",
+    "h3.job-search-card__title",
+    "a.job-card-list__title",
+]
+COMPANY_SELECTORS = [
+    "h4.base-search-card__subtitle",
+    "a.job-search-card__subtitle",
+    "span.job-card-container__primary-description",
+]
+LOCATION_SELECTORS = [
+    "span.job-search-card__location",
+    "li.job-card-container__metadata-item",
+]
+```
+
+### Detail Page Selectors
+**Seek** (`src/scraper.py`)
+
+```python
 DESCRIPTION_SELECTORS = [
     "[data-automation='jobAdDetails']",
-    ".y735df0._1JtWslb4uIaFd6u0VQ7Hr0",
-    "div[data-automation='jobDescription']"
+    "[data-automation='job-detail-description']",
+    "#job-details",
 ]
 
 SALARY_SELECTORS = [
     "[data-automation='jobSalary']",
     "span[data-automation='job-salary']",
-    ".y735df0._1TJ0c_7f2oRvPZMh6F4Qa2"
 ]
+```
+
+**LinkedIn** (`src/linkedin_scraper.py`)
+
+```python
+DESCRIPTION_SELECTORS = [
+    "div.show-more-less-html__markup",
+    "section.description__text",
+    "div.jobs-description__content",
+]
+
+CRITERIA_SELECTORS = {
+    "work_type": ["li[data-test-id='job-details-work-type']", "li[data-test-id='job-details-employment-type']"],
+    "work_arrangement": ["li[data-test-id='job-details-workplace-type']"],
+    "salary": ["li[data-test-id='job-details-salary']", "span[data-test-id='salary']"],
+    "seniority": ["li[data-test-id='job-details-seniority']"],
+}
 ```
 
 ## Error Handling Strategy
@@ -338,11 +420,12 @@ except ParseError as e:
 
 ### Current Integrations
 - **SEEK.com.au**: Primary job board target
+- **LinkedIn**: Public job listings via LinkedInScraper
 - **Crawl4AI**: Scraping framework integration
 - **OpenAI**: Optional AI features (configured but not active)
 
 ### Future Integration Points
-- **Additional Job Boards**: LinkedIn, Indeed, Glassdoor
+- **Additional Job Boards**: Indeed, Glassdoor
 - **Database Systems**: SQLite, PostgreSQL integration
 - **API Layer**: REST API for external access
 - **Monitoring Systems**: Enhanced logging and metrics

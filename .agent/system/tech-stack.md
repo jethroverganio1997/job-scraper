@@ -77,6 +77,7 @@
   - Development/production environment separation
   - Configuration management
   - Secret management
+- **Configuration Namespaces**: `SEEK_*` variables for Seek scraping and `LINKEDIN_*` variables for LinkedIn scraping
 
 ## Development Tools
 

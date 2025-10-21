@@ -166,10 +166,10 @@ When adding new documentation:
 | [Tech Stack](system/tech-stack.md) | Technology dependencies and decisions | 2025-01-17 |
 | [Job Scraper System](system/job-scraper-system.md) | Detailed system components and processing | 2025-01-17 |
 
-### Tasks Documentation (0 files)
+### Tasks Documentation (1 file)
 | Document | Purpose | Status |
 |----------|---------|--------|
-| *No task documents* | *No features planned* | *N/A* |
+| [LinkedIn Scraper Feature Plan](tasks/linkedin-scraper.md) | Implementation approach for Crawl4AI LinkedIn scraper | Completed |
 
 ### SOP Documentation (0 files)
 | Document | Purpose | Status |
@@ -178,8 +178,8 @@ When adding new documentation:
 
 ---
 
-**Last Updated**: 2025-01-17
-**Documentation Version**: 1.0
+**Last Updated**: 2025-02-15
+**Documentation Version**: 1.1
 **Project**: Job-Scraper
 
 For questions or contributions to documentation, please follow the contributing guidelines above.
