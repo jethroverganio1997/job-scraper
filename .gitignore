@@ -1,0 +1,19 @@
+# Credentials and secrets
+.env
+*.key
+*.pem
+credentials.json
+config.json
+
+# Data files
+*.csv
+*.xlsx
+*.json
+cookies.json
+linkedin_session.json
+session_cookies.json
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
